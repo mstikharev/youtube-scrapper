@@ -13,13 +13,16 @@ class YoutubeSAPI:
     def __get_channel_stat(self, ch_id: str) -> dict:
 
         def create_video_stat():
-            for pl in self.yt_api.get_channel_playlists(ch_id=ch_id):
-                for video in self.yt_api.get_videos_from_playlist(pl_id=pl):
+            curr_page_token: str = ''
+            while curr_page_token is not None:
+                curr_video_list = self.yt_api.get_videos_from_playlist(pl_id='UU' + ch_id[2:], max_results=50, next_page_token=curr_page_token)
+                curr_page_token = curr_video_list[1]
+                for video in curr_video_list[0]:
                     stat: dict = video.get('statistics')
-                    video['er'] = round(
-                        (int(stat.get('dislikeCount')) + int(stat.get('likeCount')) + int(stat.get('commentCount')))
-                        / int(stat.get('viewCount')), 3
-                    )
+                    try:
+                        video['er'] = round((int(stat.get('dislikeCount')) + int(stat.get('likeCount')) + int(stat.get('commentCount'))) / int(stat.get('viewCount')) * 100, 3)
+                    except:
+                        video['er'] = None
                     yield video
 
         return {
