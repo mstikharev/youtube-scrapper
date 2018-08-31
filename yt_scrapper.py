@@ -7,10 +7,12 @@ class YoutubeSAPI:
     yt_api = None
 
     def __init__(self, dev_token: str, channel_list: list):
-        self.channel_list = list(map(YoutubeAPI.parse_channel_id, channel_list))
         self.yt_api = YoutubeAPI(dev_token)
+        self.channel_list = [YoutubeAPI.parse_channel_id(self.yt_api, ch) for ch in channel_list]
 
     def __get_channel_stat(self, ch_id: str) -> dict:
+
+        last_ten_videos: list = []
 
         def create_video_stat():
             curr_page_token: str = ''
@@ -19,16 +21,35 @@ class YoutubeSAPI:
                 curr_page_token = curr_video_list[1]
                 for video in curr_video_list[0]:
                     stat: dict = video.get('statistics')
+                    like_c: int = int(stat.get('likeCount')) if stat.get('likeCount') is not None else 0
+                    dl_c: int = int(stat.get('dislikeCount')) if stat.get('dislikeCount') is not None else 0
+                    c_c = int(stat.get('commentCount')) if stat.get('commentCount') is not None else 0
                     try:
-                        video['er'] = round((int(stat.get('dislikeCount')) + int(stat.get('likeCount')) + int(stat.get('commentCount'))) / int(stat.get('viewCount')) * 100, 3)
+                        video['er'] = round((like_c + dl_c + c_c) / int(stat.get('viewCount')) * 100, 3)
                     except:
                         video['er'] = None
+                    if len(last_ten_videos) < 10: last_ten_videos.append(video)
                     yield video
 
-        return {
+        def get_last_ten_videos_stat(videos: list) -> int:
+            v: int = 0
+            l: int = 0
+            dl: int = 0
+            c: int = 0
+            for video in videos:
+                video_stat: dict = video.get('statistics')
+                v += int(video_stat.get('viewCount'))
+                l += int(video_stat.get('likeCount'))
+                dl += int(video_stat.get('dislikeCount'))
+                c += int(video_stat.get('commentCount'))
+            return round((l + dl + c) / v * 100, 3)
+
+        data: dict = {
             "channel_info": self.yt_api.get_channel_info(ch_id),
-            "videos_stat": list(create_video_stat()),
+            "videos_stat": list(create_video_stat())
         }
+        data['channel_info']['last_tenv_stat'] = get_last_ten_videos_stat(last_ten_videos)
+        return data
 
     def get_channels_info(self) -> list:
         return [self.__get_channel_stat(e) for e in self.channel_list]
